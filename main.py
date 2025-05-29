@@ -183,7 +183,6 @@ class Boss:
             surface.blit(boss_img, self.rect.topleft)
         else:
             pygame.draw.rect(surface, BLUE, self.rect)
-        # HP bar
         pygame.draw.rect(surface, RED, (self.rect.x, self.rect.y - 10, 100, 5))
         pygame.draw.rect(surface, GREEN, (self.rect.x, self.rect.y - 10, max(0, int(self.health / 300 * 100)), 5))
 
@@ -226,13 +225,7 @@ class WeaponPickup:
         surface.blit(text, (self.x + 8, self.y + 5))
 
 def spawn_enemies(num):
-    enemies = []
-    for _ in range(num):
-        x = random.randint(0, WIDTH - 40)
-        y = random.randint(-100, 0)
-        enemies.append(Enemy(x, y))
-    print(f"Spawn enemies: {len(enemies)}")
-    return enemies
+    return [Enemy(random.randint(0, WIDTH - 40), random.randint(-100, 0)) for _ in range(num)]
 
 def spawn_weapon_pickups():
     pickups = []
@@ -244,7 +237,7 @@ def spawn_weapon_pickups():
         pickups.append(WeaponPickup(x, y, weapon_type))
     return pickups
 
-def main():
+def game_loop():
     player = Player()
     bullets = []
     enemies = spawn_enemies(5)
@@ -252,7 +245,6 @@ def main():
     boss = None
 
     font = pygame.font.SysFont("Consolas", 24)
-    running = True
     game_over = False
     game_won = False
     score = 0
@@ -261,45 +253,34 @@ def main():
     enemy_growth = 2
     boss_wave = 5
 
-    while running:
+    while True:
         clock.tick(FPS)
-
-        if background_img:
-            screen.blit(background_img, (0, 0))
-        else:
-            screen.fill(BLACK)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                running = False
+                return
             elif event.type == pygame.KEYDOWN:
                 if event.key in (pygame.K_1, pygame.K_2, pygame.K_3) and not game_over and not game_won:
                     player.switch_weapon(event.key)
                 elif event.key == pygame.K_SPACE and not game_over and not game_won:
                     player.shoot(bullets)
                 elif event.key == pygame.K_r and (game_over or game_won):
-                    # Restart hry
-                    player = Player()
-                    bullets.clear()
-                    enemies = spawn_enemies(enemy_base_count)
-                    pickups = spawn_weapon_pickups()
-                    boss = None
-                    score = 0
-                    wave = 1
-                    game_over = False
-                    game_won = False
+                    return  # Restart
 
         keys = pygame.key.get_pressed()
+        if background_img:
+            screen.blit(background_img, (0, 0))
+        else:
+            screen.fill(BLACK)
+
         if not game_over and not game_won:
             player.move(keys)
 
-            # Aktualizace kulek
             for bullet in bullets[:]:
                 bullet.update()
                 if bullet.off_screen():
                     bullets.remove(bullet)
 
-            # Nová vlna / spawn bosse
             if not enemies and not boss:
                 wave += 1
                 if wave == boss_wave:
@@ -308,62 +289,46 @@ def main():
                     enemies = spawn_enemies(enemy_base_count + wave * enemy_growth)
                     pickups = spawn_weapon_pickups()
 
-            # Pohyb nepřátel a kolize
             for enemy in enemies[:]:
                 enemy.move_towards(player.rect)
-
                 bullets_to_remove = []
-                enemy_dead = False
-
                 for bullet in bullets:
                     if enemy.rect.colliderect(bullet.rect):
                         enemy.health -= bullet.damage
                         bullets_to_remove.append(bullet)
-                        if enemy.health <= 0:
-                            enemy_dead = True
-
                 for b in bullets_to_remove:
                     if b in bullets:
                         bullets.remove(b)
-
-                if enemy_dead:
-                    if enemy in enemies:
-                        enemies.remove(enemy)
+                if enemy.health <= 0 and enemy in enemies:
+                    enemies.remove(enemy)
                     score += 10
-
                 if enemy.rect.colliderect(player.rect):
                     player.health -= 1
                     if player.health <= 0:
                         game_over = True
 
-            # Boss logika
             if boss:
                 boss.move_towards(player.rect)
-
                 for bullet in bullets[:]:
                     if boss.rect.colliderect(bullet.rect):
                         boss.health -= bullet.damage
                         bullets.remove(bullet)
-                        if boss.health <= 0:
-                            boss = None
-                            score += 100
-                            game_won = True
-
-                if boss and boss.rect.colliderect(player.rect):
+                if boss.health <= 0:
+                    boss = None
+                    game_won = True
+                    score += 100
+                elif boss.rect.colliderect(player.rect):
                     player.health -= 2
                     if player.health <= 0:
                         game_over = True
-
                 if boss:
                     boss.draw(screen)
 
-            # Pickup zbraní
             for pickup in pickups[:]:
                 if player.rect.colliderect(pickup.rect):
                     player.current_weapon = pickup.weapon_type
                     pickups.remove(pickup)
 
-        # Vykreslení všech prvků
         player.draw(screen)
         for bullet in bullets:
             bullet.draw(screen)
@@ -372,22 +337,21 @@ def main():
         for enemy in enemies:
             enemy.draw(screen)
 
-        # Skóre a vlna
         score_text = font.render(f"Skóre: {score} | Vlna: {wave}", True, YELLOW)
         screen.blit(score_text, (WIDTH - 250, 10))
 
-        # Zprávy game over / výhra
         if game_over:
             go_text = font.render("Zábry tě vypl - Stiskni R pro restart hry", True, RED)
             screen.blit(go_text, (WIDTH//2 - go_text.get_width()//2, HEIGHT//2))
         elif game_won:
-            win_text = font.render("Podařilo se ti zneškodnit zábryho Bručná je nyní Tvůj HOOD", True, YELLOW)
+            win_text = font.render("Zabil jsi Zábryho – jsi novým majitelem Bručné", True, YELLOW)
             screen.blit(win_text, (WIDTH//2 - win_text.get_width()//2, HEIGHT//2))
 
         pygame.display.flip()
 
-    pygame.quit()
-    sys.exit()
+def main():
+    while True:
+        game_loop()
 
 if __name__ == "__main__":
     main()
