@@ -12,7 +12,6 @@ pygame.display.set_caption("BRUCNA-HOOD - Střílečka na Bručné")
 clock = pygame.time.Clock()
 FPS = 60
 
-# Barvy
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 YELLOW = (255, 255, 0)
@@ -20,7 +19,6 @@ RED = (220, 20, 60)
 GREEN = (0, 255, 0)
 BLUE = (30, 144, 255)
 
-# Načtení obrázků
 try:
     player_img = pygame.image.load("player.png").convert_alpha()
     player_img = pygame.transform.scale(player_img, (40, 40))
@@ -49,32 +47,10 @@ except Exception:
     print("boss.png nenalezen, použiji modrý čtverec")
     boss_img = None
 
-# Definice zbraní
 weapons = {
-    "pistol": {
-        "cooldown": 400,
-        "bullet_speed": 15,
-        "damage": 10,
-        "bullets_per_shot": 1,
-        "spread": 0,
-        "color": (100, 100, 255)
-    },
-    "shotgun": {
-        "cooldown": 1000,
-        "bullet_speed": 12,
-        "damage": 7,
-        "bullets_per_shot": 5,
-        "spread": 15,
-        "color": (255, 100, 100)
-    },
-    "m4": {
-        "cooldown": 150,
-        "bullet_speed": 20,
-        "damage": 8,
-        "bullets_per_shot": 1,
-        "spread": 0,
-        "color": (100, 255, 100)
-    }
+    "pistol": {"cooldown": 400, "bullet_speed": 15, "damage": 10, "bullets_per_shot": 1, "spread": 0, "color": (100, 100, 255)},
+    "shotgun": {"cooldown": 1000, "bullet_speed": 12, "damage": 10, "bullets_per_shot": 5, "spread": 15, "color": (255, 100, 100)},
+    "m4": {"cooldown": 150, "bullet_speed": 20, "damage": 8, "bullets_per_shot": 1, "spread": 0, "color": (100, 255, 100)},
 }
 
 class Player:
@@ -105,29 +81,25 @@ class Player:
 
     def can_shoot(self):
         now = pygame.time.get_ticks()
-        cd = weapons[self.current_weapon]["cooldown"]
-        return now - self.last_shot_time >= cd
+        return now - self.last_shot_time >= weapons[self.current_weapon]["cooldown"]
 
     def shoot(self, bullets):
         if self.can_shoot():
             now = pygame.time.get_ticks()
-            w = weapons[self.current_weapon]
             self.last_shot_time = now
-            cx = self.rect.centerx
-            cy = self.rect.centery
+            cx, cy = self.rect.center
             mx, my = pygame.mouse.get_pos()
             angle_to_mouse = math.atan2(my - cy, mx - cx)
+            w = weapons[self.current_weapon]
             for i in range(w["bullets_per_shot"]):
-                if w["bullets_per_shot"] == 1:
-                    angle = angle_to_mouse
-                else:
-                    spread_deg = w["spread"]
-                    offset = -spread_deg/2 + (spread_deg/(w["bullets_per_shot"]-1))*i
-                    angle = angle_to_mouse + math.radians(offset)
+                angle = angle_to_mouse
+                if w["bullets_per_shot"] > 1:
+                    spread = w["spread"]
+                    offset = -spread/2 + (spread/(w["bullets_per_shot"]-1))*i
+                    angle += math.radians(offset)
                 dx = math.cos(angle) * w["bullet_speed"]
                 dy = math.sin(angle) * w["bullet_speed"]
-                bullet = Bullet(cx, cy, dx, dy, w["damage"], w["color"])
-                bullets.append(bullet)
+                bullets.append(Bullet(cx, cy, dx, dy, w["damage"], w["color"]))
 
     def draw(self, surface):
         if player_img:
@@ -135,10 +107,8 @@ class Player:
         else:
             pygame.draw.rect(surface, GREEN, self.rect)
         font = pygame.font.SysFont("Consolas", 20)
-        text = font.render(self.current_weapon.upper(), True, WHITE)
-        surface.blit(text, (self.rect.x, self.rect.y - 25))
-        health_text = font.render(f"Health: {self.health}", True, RED)
-        surface.blit(health_text, (10, 10))
+        surface.blit(font.render(self.current_weapon.upper(), True, WHITE), (self.rect.x, self.rect.y - 25))
+        surface.blit(font.render(f"Health: {self.health}", True, RED), (10, 10))
 
 class Enemy:
     def __init__(self, x, y):
@@ -147,14 +117,11 @@ class Enemy:
         self.health = 30
 
     def move_towards(self, target_rect):
-        dx = target_rect.centerx - self.rect.centerx
-        dy = target_rect.centery - self.rect.centery
+        dx, dy = target_rect.centerx - self.rect.centerx, target_rect.centery - self.rect.centery
         dist = math.hypot(dx, dy)
         if dist != 0:
-            dx /= dist
-            dy /= dist
-            self.rect.x += dx * self.speed
-            self.rect.y += dy * self.speed
+            self.rect.x += dx / dist * self.speed
+            self.rect.y += dy / dist * self.speed
 
     def draw(self, surface):
         if enemy_img:
@@ -169,14 +136,11 @@ class Boss:
         self.speed = 1.5
 
     def move_towards(self, target_rect):
-        dx = target_rect.centerx - self.rect.centerx
-        dy = target_rect.centery - self.rect.centery
+        dx, dy = target_rect.centerx - self.rect.centerx, target_rect.centery - self.rect.centery
         dist = math.hypot(dx, dy)
         if dist != 0:
-            dx /= dist
-            dy /= dist
-            self.rect.x += dx * self.speed
-            self.rect.y += dy * self.speed
+            self.rect.x += dx / dist * self.speed
+            self.rect.y += dy / dist * self.speed
 
     def draw(self, surface):
         if boss_img:
@@ -228,14 +192,8 @@ def spawn_enemies(num):
     return [Enemy(random.randint(0, WIDTH - 40), random.randint(-100, 0)) for _ in range(num)]
 
 def spawn_weapon_pickups():
-    pickups = []
     types = ["pistol", "shotgun", "m4"]
-    for _ in range(3):
-        x = random.randint(50, WIDTH - 80)
-        y = random.randint(HEIGHT // 2, HEIGHT - 50)
-        weapon_type = random.choice(types)
-        pickups.append(WeaponPickup(x, y, weapon_type))
-    return pickups
+    return [WeaponPickup(random.randint(50, WIDTH - 80), random.randint(HEIGHT // 2, HEIGHT - 50), random.choice(types)) for _ in range(3)]
 
 def game_loop():
     player = Player()
@@ -243,39 +201,33 @@ def game_loop():
     enemies = spawn_enemies(5)
     pickups = spawn_weapon_pickups()
     boss = None
-
     font = pygame.font.SysFont("Consolas", 24)
+    small_font = pygame.font.SysFont("Consolas", 18)
     game_over = False
     game_won = False
     score = 0
     wave = 1
-    enemy_base_count = 5
-    enemy_growth = 2
-    boss_wave = 5
 
     while True:
         clock.tick(FPS)
-
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                return
-            elif event.type == pygame.KEYDOWN:
+                return False
+            if event.type == pygame.KEYDOWN:
                 if event.key in (pygame.K_1, pygame.K_2, pygame.K_3) and not game_over and not game_won:
                     player.switch_weapon(event.key)
                 elif event.key == pygame.K_SPACE and not game_over and not game_won:
                     player.shoot(bullets)
                 elif event.key == pygame.K_r and (game_over or game_won):
-                    return  # Restart
+                    return True
+                elif event.key == pygame.K_RETURN:
+                    return False
 
         keys = pygame.key.get_pressed()
-        if background_img:
-            screen.blit(background_img, (0, 0))
-        else:
-            screen.fill(BLACK)
+        screen.blit(background_img, (0, 0)) if background_img else screen.fill(BLACK)
 
         if not game_over and not game_won:
             player.move(keys)
-
             for bullet in bullets[:]:
                 bullet.update()
                 if bullet.off_screen():
@@ -283,23 +235,19 @@ def game_loop():
 
             if not enemies and not boss:
                 wave += 1
-                if wave == boss_wave:
+                if wave == 5:
                     boss = Boss()
                 else:
-                    enemies = spawn_enemies(enemy_base_count + wave * enemy_growth)
+                    enemies = spawn_enemies(5 + wave * 2)
                     pickups = spawn_weapon_pickups()
 
             for enemy in enemies[:]:
                 enemy.move_towards(player.rect)
-                bullets_to_remove = []
-                for bullet in bullets:
+                for bullet in bullets[:]:
                     if enemy.rect.colliderect(bullet.rect):
                         enemy.health -= bullet.damage
-                        bullets_to_remove.append(bullet)
-                for b in bullets_to_remove:
-                    if b in bullets:
-                        bullets.remove(b)
-                if enemy.health <= 0 and enemy in enemies:
+                        bullets.remove(bullet)
+                if enemy.health <= 0:
                     enemies.remove(enemy)
                     score += 10
                 if enemy.rect.colliderect(player.rect):
@@ -329,29 +277,45 @@ def game_loop():
                     player.current_weapon = pickup.weapon_type
                     pickups.remove(pickup)
 
-        player.draw(screen)
-        for bullet in bullets:
-            bullet.draw(screen)
-        for pickup in pickups:
-            pickup.draw(screen)
-        for enemy in enemies:
-            enemy.draw(screen)
+            player.draw(screen)
+            for bullet in bullets:
+                bullet.draw(screen)
+            for enemy in enemies:
+                enemy.draw(screen)
+            for pickup in pickups:
+                pickup.draw(screen)
 
-        score_text = font.render(f"Skóre: {score} | Vlna: {wave}", True, YELLOW)
-        screen.blit(score_text, (WIDTH - 250, 10))
+            screen.blit(font.render(f"Skóre: {score} | Vlna: {wave}", True, YELLOW), (WIDTH - 300, 10))
 
-        if game_over:
-            go_text = font.render("Zábry tě vypl - Stiskni R pro restart hry", True, RED)
-            screen.blit(go_text, (WIDTH//2 - go_text.get_width()//2, HEIGHT//2))
-        elif game_won:
-            win_text = font.render("Zabil jsi Zábryho – jsi novým majitelem Bručné", True, YELLOW)
-            screen.blit(win_text, (WIDTH//2 - win_text.get_width()//2, HEIGHT//2))
+            instructions = [
+                "Ovládání:",
+                "WASD - Pohyb",
+                "Mezerník - Střelba",
+                "1 - Pistol",
+                "2 - Shotgun",
+                "3 - M4",
+                "Enter - Ukončit hru"
+            ]
+            for i, line in enumerate(instructions):
+                screen.blit(small_font.render(line, True, WHITE), (10, HEIGHT - 20 * (len(instructions) - i)))
+
+        else:
+            msg = font.render("GAME OVER" if game_over else "VYHRÁL JSI!", True, RED if game_over else GREEN)
+            screen.fill(BLACK)
+            screen.blit(msg, (WIDTH//2 - msg.get_width()//2, HEIGHT//2 - 40))
+            screen.blit(font.render(f"Skóre: {score}", True, WHITE), (WIDTH//2 - 50, HEIGHT//2))
+            restart_msg = small_font.render("Stiskni R pro restart nebo Enter pro ukončení", True, WHITE)
+            screen.blit(restart_msg, (WIDTH//2 - restart_msg.get_width()//2, HEIGHT//2 + 40))
 
         pygame.display.flip()
 
 def main():
     while True:
-        game_loop()
+        restart = game_loop()
+        if not restart:
+            break
+    pygame.quit()
+    sys.exit()
 
 if __name__ == "__main__":
     main()
