@@ -60,6 +60,7 @@ class Player:
         self.current_weapon = "pistol"
         self.last_shot_time = 0
         self.health = 100
+        self.damage_timer = 0
 
     def move(self, keys):
         if keys[pygame.K_w] and self.rect.top > 0:
@@ -102,13 +103,19 @@ class Player:
                 bullets.append(Bullet(cx, cy, dx, dy, w["damage"], w["color"]))
 
     def draw(self, surface):
-        if player_img:
+        color_overlay = RED if self.damage_timer > 0 else GREEN
+        if player_img and self.damage_timer <= 0:
             surface.blit(player_img, self.rect.topleft)
         else:
-            pygame.draw.rect(surface, GREEN, self.rect)
+            pygame.draw.rect(surface, color_overlay, self.rect)
+
+        # Health bar
+        health_bar_width = 40
+        pygame.draw.rect(surface, RED, (self.rect.x, self.rect.y - 10, health_bar_width, 5))
+        pygame.draw.rect(surface, GREEN, (self.rect.x, self.rect.y - 10, max(0, int((self.health / 100) * health_bar_width)), 5))
+
         font = pygame.font.SysFont("Consolas", 20)
         surface.blit(font.render(self.current_weapon.upper(), True, WHITE), (self.rect.x, self.rect.y - 25))
-        surface.blit(font.render(f"Health: {self.health}", True, RED), (10, 10))
 
 class Enemy:
     def __init__(self, x, y):
@@ -133,7 +140,7 @@ class Boss:
     def __init__(self):
         self.rect = pygame.Rect(WIDTH//2 - 50, 50, 100, 100)
         self.health = 300
-        self.speed = 1.5
+        self.speed = 6
 
     def move_towards(self, target_rect):
         dx, dy = target_rect.centerx - self.rect.centerx, target_rect.centery - self.rect.centery
@@ -188,6 +195,7 @@ class WeaponPickup:
         text = font.render(self.weapon_type[0].upper(), True, BLACK)
         surface.blit(text, (self.x + 8, self.y + 5))
 
+
 def spawn_enemies(num):
     return [Enemy(random.randint(0, WIDTH - 40), random.randint(-100, 0)) for _ in range(num)]
 
@@ -228,6 +236,7 @@ def game_loop():
 
         if not game_over and not game_won:
             player.move(keys)
+
             for bullet in bullets[:]:
                 bullet.update()
                 if bullet.off_screen():
@@ -252,6 +261,7 @@ def game_loop():
                     score += 10
                 if enemy.rect.colliderect(player.rect):
                     player.health -= 1
+                    player.damage_timer = 10
                     if player.health <= 0:
                         game_over = True
 
@@ -267,6 +277,7 @@ def game_loop():
                     score += 100
                 elif boss.rect.colliderect(player.rect):
                     player.health -= 2
+                    player.damage_timer = 10
                     if player.health <= 0:
                         game_over = True
                 if boss:
@@ -285,7 +296,8 @@ def game_loop():
             for pickup in pickups:
                 pickup.draw(screen)
 
-            screen.blit(font.render(f"Skóre: {score} | Vlna: {wave}", True, YELLOW), (WIDTH - 300, 10))
+            wave_info = f"Skóre: {score} | Vlna: {wave} | Nepřátel: {len(enemies) + (1 if boss else 0)}"
+            screen.blit(font.render(wave_info, True, YELLOW), (10, 10))
 
             instructions = [
                 "Ovládání:",
@@ -299,8 +311,11 @@ def game_loop():
             for i, line in enumerate(instructions):
                 screen.blit(small_font.render(line, True, WHITE), (10, HEIGHT - 20 * (len(instructions) - i)))
 
+            if player.damage_timer > 0:
+                player.damage_timer -= 1
+
         else:
-            msg = font.render("GAME OVER" if game_over else "VYHRÁL JSI!", True, RED if game_over else GREEN)
+            msg = font.render("GAME OVER" if game_over else "Porazil jsi Zábryho jsi novým majitelem Bručné!", True, RED if game_over else GREEN)
             screen.fill(BLACK)
             screen.blit(msg, (WIDTH//2 - msg.get_width()//2, HEIGHT//2 - 40))
             screen.blit(font.render(f"Skóre: {score}", True, WHITE), (WIDTH//2 - 50, HEIGHT//2))
